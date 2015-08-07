@@ -1,209 +1,92 @@
-
-
 <html>
 <head>
-	<title>Lion</title>
-	<style>canvas { width: 100%; height: 100% }</style>
+	<meta charset="utf-8"/>
+	<title>Potree Viewer</title>
+	<link rel="stylesheet" type="text/css" href="css/potree.css">
 </head>
-<body style="margin: 0; padding: 0">
-
-	<style type="text/css">
-	
-	.info{
-		color:white;
-		font-weight: bold;
-		text-shadow:  1px  1px 1px black,
-					  1px -1px 1px black,
-					 -1px  1px 1px black,
-					 -1px -1px 1px black;
-	}
-	
-	a:hover, a:visited, a:link, a:active{
-		color: #ccccff;
-		text-decoration: none;
-	}
-	
-	</style>
+<body>
 
 	<script src="../libs/three.js/build/three.js"></script>
-	<script src="../libs/other/OrbitControls.js"></script>
 	<script src="../libs/other/stats.min.js"></script>
 	<script src="../libs/other/dat.gui.min.js"></script>
-	<script src="../src/Potree.js"></script>
-	<script src="../src/PointCloudOctreeGeometry.js"></script>
+	
+	<script src="../build/js/potree.js"></script>
+	<script src="./js/ProgressBar.js"></script>
+	
+	
+	<!-- uncomment this to debug changes to the individual js files -->
+	<!--
 	<script src="../src/PointCloudOctree.js"></script>
+	<script src="../src/PointCloudOctreeGeometry.js"></script>
 	<script src="../src/loader/POCLoader.js"></script>
-	<script src="../src/loader/PointAttributes.js"></script>
+	<script src="../src/loader/BinaryLoader.js"></script>
+	<script src="../src/materials/PointCloudMaterial.js"></script>
+	<script src="../src/EarthControls.js"></script>
+	<script src="../src/OrbitControls.js"></script>
+	<script src="../src/FirstPersonControls.js"></script>
+	<script src="../src/utils/ProfileTool.js"></script>
+	<script src="../src/utils/MeasuringTool.js"></script>
+	<script src="../src/utils/TransformationTool.js"></script>
+	<script src="../src/utils/VolumeTool.js"></script>
 	<script src="../src/utils.js"></script>
 	<script src="../src/LRU.js"></script>
-
+	<script src="../src/TextSprite.js"></script>
+	<script src="../src/Features.js"></script>
+	<script src="../src/arena4d/PointCloudArena4D.js"></script>
+	<script src="../src/arena4d/PointCloudArena4DGeometry.js"></script>
+	-->
 	
 	
-	<div id="lblNumVisibleNodes" class="info" style="position: absolute; left: 10px; top: 80px; width: 400px; color:white"></div>
-	<div id="lblNumVisiblePoints" class="info" style="position: absolute; left: 10px; top: 100px; width: 400px; color:white"></div>
 	
+	<!-- INCLUDE ADDITIONAL DEPENDENCIES HERE -->
+	<!-- INCLUDE SETTINGS HERE -->
+	<!--<script src="../libs/plasio/js/laslaz.js"></script>
+	<script src="../libs/plasio/vendor/bluebird.js"></script>
+	<script src="../build/js/laslaz.js"></script>
+	-->
+	
+	<!-- HEADING -->
 	<div class="info" style="position: absolute; left: 300px; right: 300px; top: 10px; text-align: center;">
-		<a href="http://potree.org" target="_blank">potree.org</a><br>
+		<a href="http://potree.org" target="_blank">potree.org</a>
 	</div>
 	
+	<!-- INFOS / STATS -->
+	<div id="lblNumVisibleNodes" class="info" style="position: absolute; left: 10px; top: 80px; width: 400px; color:white"></div>
+	<div id="lblNumVisiblePoints" class="info" style="position: absolute; left: 10px; top: 100px; width: 400px; color:white"></div>
+	<div id="lblMessage" class="info" style="position: absolute; left: 10px; bottom: 0px; width: 400px; color:white"></div>
+	
+	<!-- TOOLS -->
+	<div id="tools" style="position: fixed; width: 400px; bottom: 10px; right: 10px">
+		<img src="../resources/icons/earth_controls_1.png" onclick="useEarthControls()" title="Earth Controls"/>
+		<img src="../resources/icons/fps_controls.png" onclick="useFPSControls()" title="Fly Camera"/>
+		<img src="../resources/icons/orbit_controls.png" onclick="useOrbitControls()" title="Orbit Controls"/>
+		<img src="../resources/icons/focus.png" onclick="camera.zoomTo(pointcloud)" title="focus on pointcloud"/>
+		<img src="../resources/icons/flip_y_z.png" onclick="flipYZ()" title="flip y and z coordinates"/>
+		<img src="../resources/icons/angle.png" onclick="measuringTool.startInsertion({showDistances: false, showAngles: true, showArea: false, closed: true, maxMarkers: 3})" title="angle measurements"/>
+		<img src="../resources/icons/distance.png" onclick="measuringTool.startInsertion({showDistances: true, showArea: false, closed: false})" title="distance measurements"/>
+		<img src="../resources/icons/area.png" onclick="measuringTool.startInsertion({showDistances: true, showArea: true, closed: true})" title="area measurements"/>
+		<img src="../resources/icons/volume.png" onclick="volumeTool.startInsertion()" title="volume measurements"/>
+		<img src="../resources/icons/profile.png" onclick="profileTool.startInsertion({width: pointcloud.boundingSphere.radius / 100})" title="height profiles"/>
+		<img src="../resources/icons/clip_volume.png" onclick="volumeTool.startInsertion({clip: true})" title="clipping volumes"/>
+	</div>
+	
+	<div id="renderArea"></div>
+	
 	<script>
-		var defaultPointSize = 0.03;
-		var defaultLOD = 15;
-		var pointcloudPath = "../resources/pointclouds/lion_takanawa/cloud.js";
-	
-		var renderer;
-		var camera;
-		var cube;
-		var scene;
-		var pointclouds = [];
-		var cameraCube, sceneCube;
-		var stats;
-		var pointcloudMaterial;
-		
-		function loadSkybox(){
-			cameraCube = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 100000 );
-			sceneCube = new THREE.Scene();
-		
-			var path = "../resources/textures/skybox/";
-			var format = ".jpg";
-			var urls = [
-				path + 'px' + format, path + 'nx' + format,
-				path + 'py' + format, path + 'ny' + format,
-				path + 'pz' + format, path + 'nz' + format
-			];
-			
-			var textureCube = THREE.ImageUtils.loadTextureCube( urls, new THREE.CubeRefractionMapping() );
-			var material = new THREE.MeshBasicMaterial( { color: 0xffffff, envMap: textureCube, refractionRatio: 0.95 } );
-			
-			var shader = THREE.ShaderLib[ "cube" ];
-			shader.uniforms[ "tCube" ].value = textureCube;
-
-			var material = new THREE.ShaderMaterial( {
-
-				fragmentShader: shader.fragmentShader,
-				vertexShader: shader.vertexShader,
-				uniforms: shader.uniforms,
-				depthWrite: false,
-				side: THREE.BackSide
-
-			} ),
-
-			mesh = new THREE.Mesh( new THREE.BoxGeometry( 100, 100, 100 ), material );
-			sceneCube.add( mesh );
-		}
-		
-		function initGUI(){
-			var gui = new dat.GUI({
-				height : 5 * 32 - 1
-			});
-			
-			var params = {
-				PointSize: defaultPointSize,
-				LOD: defaultLOD
-			};
-			
-			var pLOD = gui.add(params, 'LOD', 0.5,20);
-			pLOD.onChange(function(value){
-				//pointCloud.LOD = value;
-				for(var i = 0; i < pointclouds.length; i++){
-					pointclouds[i].LOD = value;
-				}
-			});
-			
-			var pPointSize = gui.add(params, 'PointSize', 0.01, 0.1);
-			pPointSize.onChange(function(value){
-				pointcloudMaterial.size = value;
-			});
-		}
-		
-		function initThree(){
-			stats = new Stats();
-			stats.domElement.style.position = 'absolute';
-			stats.domElement.style.top = '0px';
-			stats.domElement.style.margin = '5px';
-			document.body.appendChild( stats.domElement );
-		
-			scene = new THREE.Scene();
-			camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100000);
-
-			renderer = new THREE.WebGLRenderer();
-			renderer.setSize(window.innerWidth, window.innerHeight);
-			renderer.autoClear = false;
-			document.body.appendChild(renderer.domElement);
-			
-			loadSkybox();
-
-			// camera and controls
-			camera.position.z = 25;
-			camera.position.y = 10;
-			camera.position.x = 15;
-			controls = new THREE.OrbitControls(camera, renderer.domElement);
-			controls.target.set( 0, 3, 0 );
-			camera.lookAt(controls.target);
-			
-			pointcloudMaterial = new THREE.PointCloudMaterial( { size: defaultPointSize, vertexColors: true } );
-			
-			//// load pointcloud
-			var pco = POCLoader.load(pointcloudPath);
-			//pointCloud = new Potree.PointCloudOctree(pco, pointcloudMaterial);
-			//pointCloud.LOD = defaultLOD;
-			//pointCloud.rotation.set(Math.PI,-1.2,0);
-			//pointCloud.moveToOrigin();
-			//pointCloud.moveToGroundPlane();
-			//scene.add(pointCloud);
-			
-			for(var i = -2; i <= 2; i++){
-				for(var j = -2; j <= 2; j++){
-					var pointcloud = new Potree.PointCloudOctree(pco, pointcloudMaterial);
-					pointcloud.LOD = defaultLOD;
-					//pointcloud.rotation.set(Math.PI,-1.2,0);
-					pointcloud.rotation.set(Math.PI/2, 0.85* -Math.PI/2, -0.0);
-					pointcloud.moveToOrigin();
-					pointcloud.moveToGroundPlane();
-					pointcloud.position.x += 8*i;
-					pointcloud.position.z += 8*j;
-					
-					pointclouds.push(pointcloud);
-					scene.add(pointcloud);
-				}
-			}
-		}
-		
-		function render() {
-					
-			requestAnimationFrame(render);
-			
-			var numVisibleNodes = 0;
-			var numVisiblePoints = 0;
-			for(var i = 0; i < pointclouds.length; i++){
-				var pointcloud = pointclouds[i];
-				pointcloud.update(camera);
-				numVisibleNodes += pointcloud.numVisibleNodes;
-				numVisiblePoints += pointcloud.numVisiblePoints;
-			}
-			
-			// render skybox
-			cameraCube.rotation.copy( camera.rotation );
-			renderer.render( sceneCube, cameraCube );
-			
-			renderer.render(scene, camera);
-			
-			document.getElementById("lblNumVisibleNodes").innerHTML = "visible nodes: " + numVisibleNodes;
-			document.getElementById("lblNumVisiblePoints").innerHTML = "visible points: " + Potree.utils.addCommas(numVisiblePoints);
-			
-			stats.update();
-			controls.update(0.1);
-			
+		var sceneProperties = {
+			path: 			"../resources/pointclouds/lion_takanawa/cloud.js",
+			cameraPosition: [3.6, 4.367, 4],// other options: cameraPosition: [10,10,10],
+			cameraTarget: 	null, 			// other options: cameraTarget: [0,0,0],
+			sizeType: 		"Adaptive",		// other options: "Fixed", "Attenuated"
+			quality: 		null, 		// other options: "Circles", "Interpolation", "Splats"
+			fov: 			75, 			// other options: "Circles", "Interpolation", "Splats"
+			material: 		"RGB", 			// other options: "Height", "Intensity", "Classification"
+			pointLimit: 	1,				// max number of points in millions
+			navigation: 	"Orbit",		// other options: "Earth", "Orbit", "Flight"
+			pointSize: 		1.0
 		};
-		
-		initThree();
-		initGUI();
-		render();
-		
 	</script>
-	
-	
-	
+	<script src="./js/viewer.js"></script>
 	
 </body>
 </html>

@@ -3,11 +3,7 @@
 
 <script src="../libs/three.js/build/three.js"></script>
 <script src="../libs/other/OrbitControls.js"></script>
-<script src="../src/Potree.js"></script>
-<script src="../src/PointCloudOctree.js"></script>
-<script src="../src/loader/POCLoader.js"></script>
-<script src="../src/loader/PointAttributes.js"></script>
-<script src="../src/utils.js"></script>
+<script src="../build/js/potree.min.js"></script>
     
 </head>
  <body style="margin: 0px; padding: 0px;">
@@ -19,7 +15,7 @@ var camera;
 var scene;
 var pickLocation;
 var mouse = { x: 1, y: 1 };
-var projector, raycaster;
+var raycaster;
 
 function generatePointcloud(){
 	var geometry = new THREE.BufferGeometry();
@@ -53,8 +49,8 @@ function generatePointcloud(){
 		}
 	}
 	
-	geometry.addAttribute('position', new THREE.Float32Attribute(positions, 3));
-	geometry.addAttribute('color', new THREE.Float32Attribute(colors, 3));
+	geometry.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+	geometry.addAttribute('color', new THREE.BufferAttribute(colors, 3));
 	
 	var material = new THREE.PointCloudMaterial({ size: 0.01, vertexColors: true });
 	var pointcloud = new THREE.PointCloud(geometry, material);
@@ -62,13 +58,10 @@ function generatePointcloud(){
 	return pointcloud;
 }
 
-
-
 function init() {
 	scene = new THREE.Scene();
 	camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 	
-	projector = new THREE.Projector();
 	raycaster = new THREE.Raycaster();
 
 	renderer = new THREE.WebGLRenderer();
@@ -105,14 +98,14 @@ function render() {
 	camera.updateMatrixWorld(true);
 	
 	vector = new THREE.Vector3( mouse.x, mouse.y, 0.5 );
-	projector.unprojectVector( vector, camera );
+	vector.unproject(camera);
 	raycaster.params = {"PointCloud" : {threshold: 0.1}};
 	raycaster.ray.set( camera.position, vector.sub( camera.position ).normalize() );
 	
 	var intersects = raycaster.intersectObject(pointcloud);
 	if(intersects.length > 0){
 		var I = intersects[0];
-		pickLocation.position = I.point;
+		pickLocation.position.copy(I.point);
 	}
 
 	renderer.render(scene, camera);
